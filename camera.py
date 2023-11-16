@@ -9,9 +9,10 @@ net = cv2.dnn.readNetFromCaffe(
 
 # Open a video capture object (0 for default camera)
 cap = cv2.VideoCapture(0)
+#need tro resize
 
 # Set the desired frame rate
-desired_fps = 5
+desired_fps = 60
 interval = 1 / desired_fps
 
 while True:
@@ -20,9 +21,11 @@ while True:
 
     # Read a frame from the camera
     ret, frame = cap.read()
+    cv2.resize(frame, (50, 50))
 
     # Resize the frame to 300x300 pixels (the size expected by the model)
-    blob = cv2.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
+    blob = cv2.dnn.blobFromImage(frame, 0.007843, (50, 50), 127.5)
+    #blob = cv2.dnn.blobFromImage(frame, 1, (50, 50), 127.5)
 
     # Set the input to the neural network
     net.setInput(blob)
