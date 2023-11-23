@@ -1,6 +1,5 @@
 import cv2
 import time
-import requests
 from discord_webhook import DiscordWebhook
 
 # Load the pre-trained MobileNet SSD model and its configuration
@@ -18,6 +17,7 @@ cap = cv2.VideoCapture(0)
 # Set the desired frame rate
 desired_fps = 30
 interval = 1 / desired_fps
+timer = 0  # timer to send screenshot every minute
 
 while True:
     # Record the start time to calculate processing time
@@ -27,12 +27,13 @@ while True:
     ret, frame = cap.read()
 
     # Resize the frame to 300x300 pixels (the size expected by the model)
-    blob = cv2.dnn.blobFromImage(frame, 0.007843, (50, 50), 127.5)
+    frame = cv2.resize(frame, (300, 300))
 
     # Set the input to the neural network
-    net.setInput(blob)
+    blob = cv2.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
 
     # Perform object detection
+    net.setInput(blob)
     detections = net.forward()
 
     person_found = False
@@ -57,8 +58,8 @@ while True:
     # Display the resulting frame
     cv2.imshow('Full-Body Detection', frame)
 
-    # If a person is found, save the frame as a screenshot
-    if person_found:
+    # If a person is found, save the frame as a screenshot and send to Discord every minute
+    if person_found and timer % 1800 == 0:  # 1800 frames at 30 fps = 60 seconds
         cv2.imwrite('screenshot.png', frame)
 
         # Send the screenshot to Discord
@@ -66,6 +67,11 @@ while True:
         with open('screenshot.png', 'rb') as f:
             webhook.add_file(file=f.read(), filename='screenshot.png')
         webhook.execute()
+        timer = 1
+        print("Screenshot sent to Discord!")
+
+    print(f"Timer: {timer}")
+    timer += 1
 
     # Calculate the processing time
     processing_time = time.time() - start_time
