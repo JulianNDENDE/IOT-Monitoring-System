@@ -2,30 +2,19 @@ import cv2
 import time
 from discord_webhook import DiscordWebhook
 
-# Load the pre-trained MobileNet SSD model and its configuration
-net = cv2.dnn.readNetFromCaffe(
-    "deploy.prototxt",
-    "mobilenet_iter_73000.caffemodel"
-)
+def load_model():
+    # Load the pre-trained MobileNet SSD model and its configuration
+    return cv2.dnn.readNetFromCaffe("deploy.prototxt", "mobilenet_iter_73000.caffemodel")
 
-# Discord webhook URL
-webhook_url = 'https://discord.com/api/webhooks/1177142622683414618/Uw5ezUS39aw0uNGlVx_uSWFXQL3OHpycOD38nBVKP3lAICTqLHS3cz2fp-ju9EkgzvhE'
+def initialize_webhook():
+    # Discord webhook URL
+    return 'https://ptb.discord.com/api/webhooks/1179307722634690691/M6QFFoudj-08JaL3Pj2QT766jysEFut6I2IzPLSTwb3ZCDTvZadPb1g-IrAoWgBo2nY4'
 
-# Open a video capture object (0 for default camera)
-cap = cv2.VideoCapture(0)
+def open_camera(capture_index=0):
+    # Open a video capture object (0 for default camera)
+    return cv2.VideoCapture(capture_index)
 
-# Set the desired frame rate
-desired_fps = 30
-interval = 1 / desired_fps
-timer = 0  # timer to send screenshot every minute
-
-while True:
-    # Record the start time to calculate processing time
-    start_time = time.time()
-
-    # Read a frame from the camera
-    ret, frame = cap.read()
-
+def process_frame(frame, net):
     # Resize the frame to 300x300 pixels (the size expected by the model)
     frame = cv2.resize(frame, (300, 300))
 
@@ -36,14 +25,17 @@ while True:
     net.setInput(blob)
     detections = net.forward()
 
+    return frame, detections
+
+def draw_and_display(frame, detections):
     person_found = False
 
     # Loop over the detections
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
 
-        # If confidence is above a certain threshold (e.g., 0.2)
-        if confidence > 0.80:
+        # If confidence is above a certain threshold (e.g., 0.8)
+        if confidence > 0.8:
             person_found = True
 
             # Get the coordinates of the bounding box
@@ -58,32 +50,59 @@ while True:
     # Display the resulting frame
     cv2.imshow('Full-Body Detection', frame)
 
-    # If a person is found, save the frame as a screenshot and send to Discord every minute
-    if person_found and timer % 1800 == 0:  # 1800 frames at 30 fps = 60 seconds
-        cv2.imwrite('screenshot.png', frame)
+    return person_found
 
-        # Send the screenshot to Discord
-        webhook = DiscordWebhook(url=webhook_url)
-        with open('screenshot.png', 'rb') as f:
-            webhook.add_file(file=f.read(), filename='screenshot.png')
-        webhook.execute()
-        timer = 1
-        print("Screenshot sent to Discord!")
+def send_screenshot_to_discord(frame, webhook_url):
+    # Save the frame as a screenshot
+    cv2.imwrite('screenshot.png', frame)
 
-    print(f"Timer: {timer}")
-    timer += 1
+    # Send the screenshot to Discord
+    webhook = DiscordWebhook(url=webhook_url)
+    with open('screenshot.png', 'rb') as f:
+        webhook.add_file(file=f.read(), filename='screenshot.png')
+    webhook.execute()
+    print("Screenshot sent to Discord!")
 
-    # Calculate the processing time
-    processing_time = time.time() - start_time
+def main():
+    net = load_model()
+    webhook_url = initialize_webhook()
+    cap = open_camera()
 
-    # Calculate the time to sleep to achieve the desired frame rate
-    sleep_time = max(0, interval - processing_time)
-    time.sleep(sleep_time)
+    desired_fps = 30
+    interval = 1 / desired_fps
+    timer = 0
 
-    # Break the loop when 'q' key is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    while True:
+        start_time = time.time()
 
-# Release the video capture object and close the OpenCV window
-cap.release()
-cv2.destroyAllWindows()
+        frame = cap.read()
+
+        frame, detections = process_frame(frame, net)
+
+        person_found = draw_and_display(frame, detections)
+
+        # Send a screenshot to Discord every 30 seconds if a person is found
+        # (900 frames at 30 fps = 30 seconds)
+        if person_found and timer % 900 == 0:
+            send_screenshot_to_discord(frame, webhook_url)
+            timer = 1
+
+        # Print the timer every 10 seconds
+        if timer % 300 == 0: 
+            print(f"Timer: {timer / 30} seconds")
+
+        timer += 1
+
+        # Sleep for the remaining time to achieve the desired FPS
+        processing_time = time.time() - start_time
+        sleep_time = max(0, interval - processing_time)
+        time.sleep(sleep_time)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'): 
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
