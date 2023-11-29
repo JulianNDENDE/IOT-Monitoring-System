@@ -3,7 +3,7 @@ import time
 from discord_webhook import DiscordWebhook
 
 def load_model():
-    # Load the pre-trained MobileNet SSD model and its configuration
+    # Load the pre-trained MobileNet SD model and its configuration
     return cv2.dnn.readNetFromCaffe("deploy.prototxt", "mobilenet_iter_73000.caffemodel")
 
 def initialize_webhook():
@@ -63,6 +63,11 @@ def send_screenshot_to_discord(frame, webhook_url):
     webhook.execute()
     print("Screenshot sent to Discord!")
 
+def cleanup(cap):
+    # Release the video capture object and close the OpenCV window
+    cap.release()
+    cv2.destroyAllWindows()
+
 def main():
     net = load_model()
     webhook_url = initialize_webhook()
@@ -71,25 +76,31 @@ def main():
     desired_fps = 30
     interval = 1 / desired_fps
     timer = 0
+    screen_sendable = False
 
     while True:
         start_time = time.time()
 
-        frame = cap.read()
+        ret, frame = cap.read()
 
         frame, detections = process_frame(frame, net)
 
         person_found = draw_and_display(frame, detections)
 
-        # Send a screenshot to Discord every 30 seconds if a person is found
+        # reset screen_sendable every 30 seconds
         # (900 frames at 30 fps = 30 seconds)
-        if person_found and timer % 900 == 0:
+        if screen_sendable and timer % 900 == 0:
+            screen_sendable = False
+
+        # Send a screenshot to Discord if a person is found
+        if person_found and not screen_sendable:
             send_screenshot_to_discord(frame, webhook_url)
             timer = 1
+            screen_sendable = True
 
         # Print the timer every 10 seconds
-        if timer % 300 == 0: 
-            print(f"Timer: {timer / 30} seconds")
+        if timer % 300 == 0:
+            print(f"Timer: {round(timer / 30)} seconds")
 
         timer += 1
 
@@ -98,11 +109,11 @@ def main():
         sleep_time = max(0, interval - processing_time)
         time.sleep(sleep_time)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'): 
+        key = cv2.waitKey(1)
+        if key == ord('q') or key == 27:  # 'q' or Esc key
             break
 
-    cap.release()
-    cv2.destroyAllWindows()
+    cleanup(cap)
 
 if __name__ == "__main__":
     main()
