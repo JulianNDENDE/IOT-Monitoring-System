@@ -1,5 +1,6 @@
 import cv2
 import time
+import datetime
 from discord_webhook import DiscordWebhook
 
 def load_model():
@@ -27,7 +28,8 @@ def process_frame(frame, net):
 
     return frame, detections
 
-def draw_and_display(frame, detections):
+def draw_and_display(frame, detections, start_time):
+    end = datetime.datetime.now() 
     person_found = False
 
     # Loop over the detections
@@ -46,6 +48,8 @@ def draw_and_display(frame, detections):
             cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
             text = f"{confidence:.2f}%"
             cv2.putText(frame, text, (startX, startY - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            fps = f"FPS: {1 / (end - start_time).total_seconds():.2f}"
+            cv2.putText(frame, fps, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
     # Display the resulting frame
     cv2.imshow('Full-Body Detection', frame)
@@ -80,12 +84,13 @@ def main():
 
     while True:
         start_time = time.time()
+        start = datetime.datetime.now() 
 
         ret, frame = cap.read()
 
         frame, detections = process_frame(frame, net)
 
-        person_found = draw_and_display(frame, detections)
+        person_found = draw_and_display(frame, detections, start)
 
         # reset screen_sendable every 30 seconds
         # (900 frames at 30 fps = 30 seconds)
